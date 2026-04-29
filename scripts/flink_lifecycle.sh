@@ -13,8 +13,14 @@
 #
 # Required env (set by the workflow from GitHub Actions secrets):
 #   ORG_ID, ENV_ID, COMPUTE_POOL_ID
-#   CONFLUENT_CLOUD_API_KEY, CONFLUENT_CLOUD_API_SECRET
-#   CONFLUENT_FLINK_API_KEY,  CONFLUENT_FLINK_API_SECRET
+#   CONFLUENT_CLOUD_API_KEY, CONFLUENT_CLOUD_API_SECRET    (resource-level)
+#   CONFLUENT_FLINK_API_KEY,  CONFLUENT_FLINK_API_SECRET   (Flink-region-level)
+#
+# Auth model:
+#   No `confluent login` is performed. The Confluent CLI authenticates Flink
+#   statement commands from the CONFLUENT_FLINK_API_KEY / CONFLUENT_FLINK_API_SECRET
+#   env vars (Flink-region-scoped). The cloud-level API key is set for any
+#   non-Flink CLI command that may run alongside.
 #
 # Usage from the workflow:
 #   ./scripts/flink_lifecycle.sh stop orders_by_item
@@ -31,30 +37,34 @@ if [[ "$ACTION" != "list" && -z "$STATEMENT" ]]; then
   exit 2
 fi
 
-echo "==> Logging in to Confluent Cloud (org $ORG_ID)"
-confluent login --save --no-browser --organization "$ORG_ID"
-confluent environment use "$ENV_ID"
+# Common flags applied to every `confluent flink statement *` invocation.
+# --environment selects the Confluent Cloud env without needing `confluent environment use`,
+# which would require an active login session.
+FLINK_FLAGS=(
+  --environment   "$ENV_ID"
+  --compute-pool  "$COMPUTE_POOL_ID"
+)
 
 case "$ACTION" in
   stop)
     echo "==> Stopping statement: $STATEMENT (state retained)"
-    confluent flink statement stop "$STATEMENT" --compute-pool "$COMPUTE_POOL_ID"
+    confluent flink statement stop "$STATEMENT" "${FLINK_FLAGS[@]}"
     ;;
   resume)
     echo "==> Resuming statement: $STATEMENT"
-    confluent flink statement resume "$STATEMENT" --compute-pool "$COMPUTE_POOL_ID"
+    confluent flink statement resume "$STATEMENT" "${FLINK_FLAGS[@]}"
     ;;
   delete)
     echo "==> Deleting statement: $STATEMENT (NOT reversible)"
-    confluent flink statement delete "$STATEMENT" --compute-pool "$COMPUTE_POOL_ID" --force
+    confluent flink statement delete "$STATEMENT" "${FLINK_FLAGS[@]}" --force
     ;;
   describe)
     echo "==> Describing statement: $STATEMENT"
-    confluent flink statement describe "$STATEMENT" --compute-pool "$COMPUTE_POOL_ID" -o yaml
+    confluent flink statement describe "$STATEMENT" "${FLINK_FLAGS[@]}" -o yaml
     ;;
   list)
     echo "==> Listing statements in compute pool $COMPUTE_POOL_ID"
-    confluent flink statement list --compute-pool "$COMPUTE_POOL_ID"
+    confluent flink statement list "${FLINK_FLAGS[@]}"
     ;;
   *)
     echo "ERROR: unknown action '$ACTION' (expected: stop|resume|delete|describe|list)" >&2

@@ -41,10 +41,11 @@ jobs:
     # under Repo Settings → Environments → {dev,staging,prod}.
     environment: ${{ github.event.inputs.env }}
     env:
-      # Cloud-level (Terraform bootstrap) credentials
+      # API-key-only auth. The Confluent CLI auto-authenticates from these
+      # env vars without a `confluent login` call (no email/password needed).
       CONFLUENT_CLOUD_API_KEY: ${{ secrets.CONFLUENT_CLOUD_API_KEY }}
       CONFLUENT_CLOUD_API_SECRET: ${{ secrets.CONFLUENT_CLOUD_API_SECRET }}
-      # Flink-pool-scoped credentials (used by `confluent flink statement *`)
+      # Flink-region-scoped credentials (used by `confluent flink statement *`)
       CONFLUENT_FLINK_API_KEY: ${{ secrets.CONFLUENT_FLINK_API_KEY }}
       CONFLUENT_FLINK_API_SECRET: ${{ secrets.CONFLUENT_FLINK_API_SECRET }}
       # Per-environment IDs (looked up dynamically by env input)

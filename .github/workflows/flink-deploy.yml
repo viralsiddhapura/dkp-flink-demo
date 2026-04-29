@@ -25,6 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.env || 'dev' }}
     env:
+      # API-key-only auth. The Confluent CLI auto-authenticates from these
+      # env vars without a `confluent login` call (no email/password needed).
       CONFLUENT_CLOUD_API_KEY: ${{ secrets.CONFLUENT_CLOUD_API_KEY }}
       CONFLUENT_CLOUD_API_SECRET: ${{ secrets.CONFLUENT_CLOUD_API_SECRET }}
       CONFLUENT_FLINK_API_KEY: ${{ secrets.CONFLUENT_FLINK_API_KEY }}

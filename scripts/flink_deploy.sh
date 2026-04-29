@@ -9,7 +9,14 @@
 #
 # Required env:
 #   ORG_ID, ENV_ID, COMPUTE_POOL_ID
-#   CONFLUENT_CLOUD_API_KEY / CONFLUENT_CLOUD_API_SECRET (for `confluent login`)
+#   CONFLUENT_CLOUD_API_KEY  / CONFLUENT_CLOUD_API_SECRET   (resource-level, for cloud REST)
+#   CONFLUENT_FLINK_API_KEY  / CONFLUENT_FLINK_API_SECRET   (Flink-region-level, for statement ops)
+#
+# Auth model:
+#   No `confluent login` is performed. The Confluent CLI authenticates Flink
+#   statement commands from the CONFLUENT_FLINK_API_KEY / CONFLUENT_FLINK_API_SECRET
+#   env vars (Flink-region-scoped). The cloud-level API key is set for any
+#   non-Flink CLI command that may run alongside.
 #
 # Notes on safety:
 #   - We never `delete` a stateful statement. We `stop` it (which retains state)
@@ -28,12 +35,16 @@ echo "==> Deploying statement: $STATEMENT_NAME"
 echo "    file: $SQL_FILE"
 echo "    env:  $ENV_ID  pool: $COMPUTE_POOL_ID"
 
-confluent login --save --no-browser --organization "$ORG_ID"
-confluent environment use "$ENV_ID"
+# Common flags applied to every `confluent flink statement *` invocation.
+# --environment selects the Confluent Cloud env without needing `confluent environment use`,
+# which would require an active login session.
+FLINK_FLAGS=(
+  --environment   "$ENV_ID"
+  --compute-pool  "$COMPUTE_POOL_ID"
+)
 
 current_status() {
-  confluent flink statement describe "$STATEMENT_NAME" \
-    --compute-pool "$COMPUTE_POOL_ID" -o json 2>/dev/null \
+  confluent flink statement describe "$STATEMENT_NAME" "${FLINK_FLAGS[@]}" -o json 2>/dev/null \
     | jq -r '.status.phase // "ABSENT"' \
     || echo "ABSENT"
 }
@@ -44,7 +55,7 @@ echo "    current phase: $CURRENT"
 # Step 1: stop existing statement (retains state for resume)
 if [[ "$CURRENT" == "RUNNING" ]]; then
   echo "==> Stopping existing statement (savepoint will be retained)"
-  confluent flink statement stop "$STATEMENT_NAME" --compute-pool "$COMPUTE_POOL_ID"
+  confluent flink statement stop "$STATEMENT_NAME" "${FLINK_FLAGS[@]}"
 fi
 
 # Step 2: submit new SQL. We rename to <name>_v<git-short-sha> so that we keep
@@ -54,8 +65,7 @@ GIT_SHA="$(git rev-parse --short=8 HEAD)"
 NEW_NAME="${STATEMENT_NAME}_${GIT_SHA}"
 
 echo "==> Submitting new statement: $NEW_NAME"
-confluent flink statement create "$NEW_NAME" \
-  --compute-pool "$COMPUTE_POOL_ID" \
+confluent flink statement create "$NEW_NAME" "${FLINK_FLAGS[@]}" \
   --sql "$(cat "$SQL_FILE")"
 
 # Step 3: wait until RUNNING (or fail loudly)
@@ -63,18 +73,17 @@ echo "==> Waiting up to ${DEPLOY_TIMEOUT}s for $NEW_NAME to reach RUNNING"
 deadline=$(( $(date +%s) + DEPLOY_TIMEOUT ))
 while :; do
   phase="$(
-    confluent flink statement describe "$NEW_NAME" \
-      --compute-pool "$COMPUTE_POOL_ID" -o json | jq -r '.status.phase'
+    confluent flink statement describe "$NEW_NAME" "${FLINK_FLAGS[@]}" -o json | jq -r '.status.phase'
   )"
   echo "    phase: $phase"
   case "$phase" in
-    RUNNING) break ;;
+    RUNNING|COMPLETED) break ;;
     FAILED|DEGRADED)
       echo "ERROR: statement entered $phase. Rolling back." >&2
-      confluent flink statement delete "$NEW_NAME" --compute-pool "$COMPUTE_POOL_ID" --force || true
+      confluent flink statement delete "$NEW_NAME" "${FLINK_FLAGS[@]}" --force || true
       if [[ "$CURRENT" == "RUNNING" ]]; then
         echo "==> Resuming prior statement $STATEMENT_NAME"
-        confluent flink statement resume "$STATEMENT_NAME" --compute-pool "$COMPUTE_POOL_ID" || true
+        confluent flink statement resume "$STATEMENT_NAME" "${FLINK_FLAGS[@]}" || true
       fi
       exit 1
       ;;
@@ -89,7 +98,7 @@ done
 # Step 4: clean up the old statement only after the new one is RUNNING.
 if [[ "$CURRENT" != "ABSENT" ]]; then
   echo "==> Removing prior statement: $STATEMENT_NAME"
-  confluent flink statement delete "$STATEMENT_NAME" --compute-pool "$COMPUTE_POOL_ID" --force || true
+  confluent flink statement delete "$STATEMENT_NAME" "${FLINK_FLAGS[@]}" --force || true
 fi
 
 echo "==> $NEW_NAME RUNNING. Done."
