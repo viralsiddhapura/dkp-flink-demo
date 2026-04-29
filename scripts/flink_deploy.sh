@@ -70,10 +70,14 @@ api_call() {
   local method="$1" path="$2" body="${3:-}"
   local resp; resp="$(mktemp)"
   local http
+  # PATCH against the Flink Statement API takes RFC 6902 JSON Patch arrays,
+  # so we send the matching content type for that method specifically.
+  local content_type="application/json"
+  [[ "${method}" == "PATCH" ]] && content_type="application/json-patch+json"
   if [[ -n "${body}" ]]; then
     http="$(curl -sS -u "${CONFLUENT_FLINK_API_KEY}:${CONFLUENT_FLINK_API_SECRET}" \
       -X "${method}" "${FLINK_BASE}${path}" \
-      -H "Content-Type: application/json" -d "${body}" \
+      -H "Content-Type: ${content_type}" -d "${body}" \
       -o "${resp}" -w "%{http_code}")"
   else
     http="$(curl -sS -u "${CONFLUENT_FLINK_API_KEY}:${CONFLUENT_FLINK_API_SECRET}" \
@@ -107,7 +111,7 @@ fi
 # ---------- Step 2: if existing is running, stop it (state retained) ----------
 if [[ "${CURRENT}" == "EXISTS" && "${CURRENT_STOPPED}" != "true" ]]; then
   echo "==> Stopping existing statement (state retained)"
-  RESULT="$(api_call PATCH "/${STATEMENT_NAME}" '{"spec":{"stopped":true}}')"
+  RESULT="$(api_call PATCH "/${STATEMENT_NAME}" '[{"op":"replace","path":"/spec/stopped","value":true}]')"
   HTTP="${RESULT%%|*}"
   RESP="${RESULT##*|}"
   if [[ "${HTTP}" -ge 300 ]]; then
@@ -172,7 +176,7 @@ while :; do
       api_call DELETE "/${NEW_NAME}" >/dev/null || true
       if [[ "${CURRENT}" == "EXISTS" && "${CURRENT_STOPPED}" != "true" ]]; then
         echo "==> Resuming prior statement ${STATEMENT_NAME}"
-        api_call PATCH "/${STATEMENT_NAME}" '{"spec":{"stopped":false}}' >/dev/null || true
+        api_call PATCH "/${STATEMENT_NAME}" '[{"op":"replace","path":"/spec/stopped","value":false}]' >/dev/null || true
       fi
       exit 1
       ;;
