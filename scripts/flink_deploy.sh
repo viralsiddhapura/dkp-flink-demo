@@ -25,7 +25,10 @@ set -euo pipefail
 SQL_FILE="${1:?usage: flink_deploy.sh <sql-file>}"
 [[ -f "$SQL_FILE" ]] || { echo "missing file: $SQL_FILE" >&2; exit 2; }
 
-STATEMENT_NAME="$(basename "$SQL_FILE" .sql)"
+# Confluent Cloud Flink statement name rules: lowercase alphanumeric + hyphens
+# only, must start with alphanumeric, max 100 chars. We derive from the SQL
+# filename, translating underscores to hyphens and lowercasing.
+STATEMENT_NAME="$(basename "$SQL_FILE" .sql | tr '_A-Z' '-a-z')"
 DEPLOY_TIMEOUT="${DEPLOY_TIMEOUT:-300}"
 
 # REST endpoints
@@ -109,7 +112,7 @@ fi
 
 # ---------- Step 3: submit new versioned statement ----------
 GIT_SHA="$(git rev-parse --short=8 HEAD)"
-NEW_NAME="${STATEMENT_NAME}_${GIT_SHA}"
+NEW_NAME="${STATEMENT_NAME}-${GIT_SHA}"
 
 # Build the request body with jq to safely escape the SQL contents.
 BODY="$(jq -n \
