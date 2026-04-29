@@ -21,6 +21,5 @@ CREATE TABLE IF NOT EXISTS `inventory.avro.topic` (
 ) WITH (
   'changelog.mode'    = 'append',
   'value.format'      = 'avro-registry',
-  'key.format'        = 'raw',
   'scan.startup.mode' = 'latest-offset'
 );
