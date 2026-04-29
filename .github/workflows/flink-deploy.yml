@@ -44,12 +44,6 @@ jobs:
         with:
           fetch-depth: 2   # need previous commit for diff on push events
 
-      - name: Install Confluent CLI
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          curl -sL --http1.1 https://cnfl.io/cli | sh -s -- -b "$HOME/.local/bin" latest
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
       - name: Determine changed statements
         id: changes
         run: |
