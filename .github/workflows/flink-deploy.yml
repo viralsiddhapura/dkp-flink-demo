@@ -39,7 +39,9 @@ jobs:
 
       - name: Install Confluent CLI
         run: |
-          curl -sL --http1.1 https://cnfl.io/cli | sh -s -- -b /usr/local/bin latest
+          mkdir -p "$HOME/.local/bin"
+          curl -sL --http1.1 https://cnfl.io/cli | sh -s -- -b "$HOME/.local/bin" latest
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Determine changed statements
         id: changes
