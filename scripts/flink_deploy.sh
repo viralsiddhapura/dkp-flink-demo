@@ -111,7 +111,7 @@ fi
 # ---------- Step 2: if existing is running, stop it (state retained) ----------
 if [[ "${CURRENT}" == "EXISTS" && "${CURRENT_STOPPED}" != "true" ]]; then
   echo "==> Stopping existing statement (state retained)"
-  RESULT="$(api_call PATCH "/${STATEMENT_NAME}" '[{"op":"add","path":"/spec/stopped","value":true}]')"
+  RESULT="$(api_call PATCH "/${STATEMENT_NAME}" '[{"op":"replace","path":"/spec/stopped","value":true}]')"
   HTTP="${RESULT%%|*}"
   RESP="${RESULT##*|}"
   if [[ "${HTTP}" -ge 300 ]]; then
@@ -176,7 +176,7 @@ while :; do
       api_call DELETE "/${NEW_NAME}" >/dev/null || true
       if [[ "${CURRENT}" == "EXISTS" && "${CURRENT_STOPPED}" != "true" ]]; then
         echo "==> Resuming prior statement ${STATEMENT_NAME}"
-        api_call PATCH "/${STATEMENT_NAME}" '[{"op":"add","path":"/spec/stopped","value":false}]' >/dev/null || true
+        api_call PATCH "/${STATEMENT_NAME}" '[{"op":"replace","path":"/spec/stopped","value":false}]' >/dev/null || true
       fi
       exit 1
       ;;
