@@ -10,9 +10,14 @@
 # key is used once to look up the principal that owns the Flink key.
 #
 # Required env (set by the workflow from GitHub Actions secrets):
-#   ORG_ID, ENV_ID, COMPUTE_POOL_ID, CLOUD, REGION
+#   ORG_ID, ENV_ID, COMPUTE_POOL_ID, CLOUD, REGION, CATALOG, DATABASE
 #   CONFLUENT_CLOUD_API_KEY  / CONFLUENT_CLOUD_API_SECRET   (resource-level)
 #   CONFLUENT_FLINK_API_KEY  / CONFLUENT_FLINK_API_SECRET   (Flink-region-level)
+#
+# CATALOG  = the Confluent Cloud environment display name (e.g., "default")
+# DATABASE = the Kafka cluster display name within that environment (e.g., "cluster_0")
+# These are passed as Flink SQL session properties so unqualified table names
+# in the SQL resolve correctly.
 #
 # Notes on safety:
 #   - We never `delete` a stateful statement before its replacement is RUNNING.
@@ -115,15 +120,24 @@ GIT_SHA="$(git rev-parse --short=8 HEAD)"
 NEW_NAME="${STATEMENT_NAME}-${GIT_SHA}"
 
 # Build the request body with jq to safely escape the SQL contents.
+# `properties.sql.current-catalog` / `sql.current-database` set the SQL session
+# context so unqualified table references (e.g., `inventory.avro.topic`)
+# resolve to the right Confluent Cloud env + Kafka cluster.
 BODY="$(jq -n \
   --arg name      "${NEW_NAME}" \
   --arg statement "$(cat "${SQL_FILE}")" \
   --arg pool      "${COMPUTE_POOL_ID}" \
   --arg principal "${PRINCIPAL}" \
+  --arg catalog   "${CATALOG}" \
+  --arg database  "${DATABASE}" \
   '{
     name: $name,
     spec: {
       statement: $statement,
+      properties: {
+        "sql.current-catalog":  $catalog,
+        "sql.current-database": $database
+      },
       compute_pool_id: $pool,
       principal: $principal,
       stopped: false

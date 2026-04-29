@@ -33,11 +33,16 @@ jobs:
       CONFLUENT_FLINK_API_SECRET: ${{ secrets.CONFLUENT_FLINK_API_SECRET }}
       ENV_ID: ${{ secrets[format('CONFLUENT_ENV_ID_{0}', github.event.inputs.env || 'DEV')] }}
       COMPUTE_POOL_ID: ${{ secrets[format('CONFLUENT_FLINK_COMPUTE_POOL_ID_{0}', github.event.inputs.env || 'DEV')] }}
-      # Cloud + region of the Flink compute pool. Forces the CLI into Cloud
-      # mode (vs. CMF / on-prem). Values match the pool's "Cloud" + "Region"
-      # in Confluent Cloud UI (e.g., aws / us-east-1).
+      # Cloud + region of the Flink compute pool (forces Cloud mode, not CMF).
+      # Values match the pool's "Cloud" + "Region" in Confluent Cloud UI
+      # (e.g., aws / us-east-1).
       CLOUD:  ${{ secrets[format('CONFLUENT_CLOUD_PROVIDER_{0}', github.event.inputs.env || 'DEV')] }}
       REGION: ${{ secrets[format('CONFLUENT_CLOUD_REGION_{0}', github.event.inputs.env || 'DEV')] }}
+      # Flink SQL context — catalog = environment display name,
+      # database = Kafka cluster display name. Required so unqualified table
+      # references in SQL resolve correctly.
+      CATALOG:  ${{ secrets[format('CONFLUENT_FLINK_CATALOG_{0}', github.event.inputs.env || 'DEV')] }}
+      DATABASE: ${{ secrets[format('CONFLUENT_FLINK_DATABASE_{0}', github.event.inputs.env || 'DEV')] }}
       ORG_ID: ${{ secrets.CONFLUENT_ORG_ID }}
     steps:
       - uses: actions/checkout@v4
