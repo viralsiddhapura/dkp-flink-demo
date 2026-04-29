@@ -8,7 +8,7 @@
 # statement name "q1_alloc_business_date").
 #
 # Required env:
-#   ORG_ID, ENV_ID, COMPUTE_POOL_ID
+#   ORG_ID, ENV_ID, COMPUTE_POOL_ID, CLOUD, REGION
 #   CONFLUENT_CLOUD_API_KEY  / CONFLUENT_CLOUD_API_SECRET   (resource-level, for cloud REST)
 #   CONFLUENT_FLINK_API_KEY  / CONFLUENT_FLINK_API_SECRET   (Flink-region-level, for statement ops)
 #
@@ -36,9 +36,13 @@ echo "    file: $SQL_FILE"
 echo "    env:  $ENV_ID  pool: $COMPUTE_POOL_ID"
 
 # Common flags applied to every `confluent flink statement *` invocation.
+# --cloud + --region force the CLI into Confluent Cloud mode (without these,
+# the CLI defaults to CMF / on-prem mode and asks for CONFLUENT_CMF_URL).
 # --environment selects the Confluent Cloud env without needing `confluent environment use`,
 # which would require an active login session.
 FLINK_FLAGS=(
+  --cloud         "$CLOUD"
+  --region        "$REGION"
   --environment   "$ENV_ID"
   --compute-pool  "$COMPUTE_POOL_ID"
 )

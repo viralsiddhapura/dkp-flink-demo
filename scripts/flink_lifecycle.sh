@@ -12,7 +12,7 @@
 #   list       — list all statements in the compute pool (statement name not required)
 #
 # Required env (set by the workflow from GitHub Actions secrets):
-#   ORG_ID, ENV_ID, COMPUTE_POOL_ID
+#   ORG_ID, ENV_ID, COMPUTE_POOL_ID, CLOUD, REGION
 #   CONFLUENT_CLOUD_API_KEY, CONFLUENT_CLOUD_API_SECRET    (resource-level)
 #   CONFLUENT_FLINK_API_KEY,  CONFLUENT_FLINK_API_SECRET   (Flink-region-level)
 #
@@ -38,9 +38,13 @@ if [[ "$ACTION" != "list" && -z "$STATEMENT" ]]; then
 fi
 
 # Common flags applied to every `confluent flink statement *` invocation.
+# --cloud + --region force the CLI into Confluent Cloud mode (without these,
+# the CLI defaults to CMF / on-prem mode and asks for CONFLUENT_CMF_URL).
 # --environment selects the Confluent Cloud env without needing `confluent environment use`,
 # which would require an active login session.
 FLINK_FLAGS=(
+  --cloud         "$CLOUD"
+  --region        "$REGION"
   --environment   "$ENV_ID"
   --compute-pool  "$COMPUTE_POOL_ID"
 )

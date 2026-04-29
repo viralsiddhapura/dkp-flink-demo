@@ -51,6 +51,11 @@ jobs:
       # Per-environment IDs (looked up dynamically by env input)
       ENV_ID: ${{ secrets[format('CONFLUENT_ENV_ID_{0}', github.event.inputs.env)] }}
       COMPUTE_POOL_ID: ${{ secrets[format('CONFLUENT_FLINK_COMPUTE_POOL_ID_{0}', github.event.inputs.env)] }}
+      # Cloud + region of the Flink compute pool. Forces the CLI into Cloud
+      # mode (vs. CMF / on-prem). Values match the pool's "Cloud" + "Region"
+      # in Confluent Cloud UI (e.g., aws / us-east-1).
+      CLOUD:  ${{ secrets[format('CONFLUENT_CLOUD_PROVIDER_{0}', github.event.inputs.env)] }}
+      REGION: ${{ secrets[format('CONFLUENT_CLOUD_REGION_{0}', github.event.inputs.env)] }}
       ORG_ID: ${{ secrets.CONFLUENT_ORG_ID }}
     steps:
       - uses: actions/checkout@v4
