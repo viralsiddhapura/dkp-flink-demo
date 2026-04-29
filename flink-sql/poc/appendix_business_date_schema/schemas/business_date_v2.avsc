@@ -1,0 +1,28 @@
+{
+  "type": "record",
+  "name": "BusinessDate",
+  "namespace": "com.dkp.positions",
+  "fields": [
+    {
+      "name": "business_date",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "DEPRECATED: instant in microseconds. Read business_date_v2 instead. Will be removed in v3."
+    },
+    {
+      "name": "business_date_v2",
+      "type": [
+        "null",
+        {
+          "type": "int",
+          "logicalType": "date"
+        }
+      ],
+      "default": null,
+      "doc": "Calendar date (days since epoch). No TZ component. Source of truth post-migration."
+    },
+    { "name": "trading_session", "type": ["null", "string"], "default": null }
+  ]
+}

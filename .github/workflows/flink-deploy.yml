@@ -1,0 +1,60 @@
+name: flink-deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "flink-sql/**"
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Target environment"
+        required: true
+        default: "dev"
+        type: choice
+        options: [dev, staging, prod]
+      statement:
+        description: "Statement name to deploy (omit to deploy all changed)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.env || 'dev' }}
+    env:
+      CONFLUENT_CLOUD_API_KEY: ${{ secrets.CONFLUENT_CLOUD_API_KEY }}
+      CONFLUENT_CLOUD_API_SECRET: ${{ secrets.CONFLUENT_CLOUD_API_SECRET }}
+      CONFLUENT_FLINK_API_KEY: ${{ secrets.CONFLUENT_FLINK_API_KEY }}
+      CONFLUENT_FLINK_API_SECRET: ${{ secrets.CONFLUENT_FLINK_API_SECRET }}
+      ENV_ID: ${{ secrets[format('CONFLUENT_ENV_ID_{0}', github.event.inputs.env || 'DEV')] }}
+      COMPUTE_POOL_ID: ${{ secrets[format('CONFLUENT_FLINK_COMPUTE_POOL_ID_{0}', github.event.inputs.env || 'DEV')] }}
+      ORG_ID: ${{ secrets.CONFLUENT_ORG_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2   # need previous commit for diff on push events
+
+      - name: Install Confluent CLI
+        run: |
+          curl -sL --http1.1 https://cnfl.io/cli | sh -s -- -b /usr/local/bin latest
+
+      - name: Determine changed statements
+        id: changes
+        run: |
+          if [ -n "${{ github.event.inputs.statement }}" ]; then
+            echo "files=flink-sql/queries/${{ github.event.inputs.statement }}.sql" >> $GITHUB_OUTPUT
+          else
+            git diff --name-only HEAD~1 HEAD -- 'flink-sql/queries/**/*.sql' > changed.txt
+            echo "files=$(paste -sd ',' changed.txt)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy each statement (stop-with-savepoint → submit → verify)
+        if: steps.changes.outputs.files != ''
+        run: |
+          IFS=',' read -ra FILES <<< "${{ steps.changes.outputs.files }}"
+          for f in "${FILES[@]}"; do
+            ./scripts/flink_deploy.sh "$f"
+          done

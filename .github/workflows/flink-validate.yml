@@ -1,0 +1,52 @@
+name: flink-validate
+
+on:
+  pull_request:
+    paths:
+      - "flink-sql/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    environment: dev   # PR validation runs against dev compute pool
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Confluent CLI
+        run: |
+          curl -sL --http1.1 https://cnfl.io/cli | sh -s -- -b /usr/local/bin latest
+          confluent version
+
+      - name: Confluent login (service account)
+        env:
+          CONFLUENT_CLOUD_API_KEY: ${{ secrets.CONFLUENT_CLOUD_API_KEY }}
+          CONFLUENT_CLOUD_API_SECRET: ${{ secrets.CONFLUENT_CLOUD_API_SECRET }}
+        run: |
+          confluent login --save \
+            --no-browser \
+            --organization-id "${{ secrets.CONFLUENT_ORG_ID }}"
+
+      - name: List changed SQL files
+        id: changes
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git diff --name-only origin/${{ github.base_ref }}...HEAD -- 'flink-sql/**/*.sql' \
+            | tee changed.txt
+          echo "files=$(paste -sd ',' changed.txt)" >> $GITHUB_OUTPUT
+
+      - name: EXPLAIN each changed statement
+        if: steps.changes.outputs.files != ''
+        env:
+          ENV_ID: ${{ secrets.CONFLUENT_ENV_ID_DEV }}
+          COMPUTE_POOL_ID: ${{ secrets.CONFLUENT_FLINK_COMPUTE_POOL_ID_DEV }}
+        run: |
+          IFS=',' read -ra FILES <<< "${{ steps.changes.outputs.files }}"
+          for f in "${FILES[@]}"; do
+            echo "::group::EXPLAIN $f"
+            ./scripts/flink_explain.sh "$f"
+            echo "::endgroup::"
+          done

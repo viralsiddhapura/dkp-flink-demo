@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "BusinessDate",
+  "namespace": "com.dkp.positions",
+  "fields": [
+    {
+      "name": "business_date",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "DEPRECATED: instant in microseconds. Suffers TZ drift across midnight ET. Prefer business_date_v2."
+    },
+    { "name": "trading_session", "type": ["null", "string"], "default": null }
+  ]
+}

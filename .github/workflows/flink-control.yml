@@ -1,0 +1,74 @@
+name: flink-control
+
+# Manual lifecycle controls for Flink statements: stop / resume / delete /
+# describe / list. Triggered exclusively via workflow_dispatch — there is no
+# automatic trigger here. This is the operator-action surface that replaces
+# clicking buttons in the Confluent Cloud UI.
+#
+# The deploy lifecycle (push-to-main → submit) lives in flink-deploy.yml.
+# This workflow handles operate-time actions on already-deployed statements.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Lifecycle action to perform"
+        required: true
+        type: choice
+        options:
+          - stop
+          - resume
+          - delete
+          - describe
+          - list
+      env:
+        description: "Target environment"
+        required: true
+        default: dev
+        type: choice
+        options: [dev, staging, prod]
+      statement:
+        description: "Statement name (required for stop/resume/delete/describe; ignored for list)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  control:
+    runs-on: ubuntu-latest
+    # GitHub Environments give per-env secret scoping. Configure secrets
+    # under Repo Settings → Environments → {dev,staging,prod}.
+    environment: ${{ github.event.inputs.env }}
+    env:
+      # Cloud-level (Terraform bootstrap) credentials
+      CONFLUENT_CLOUD_API_KEY: ${{ secrets.CONFLUENT_CLOUD_API_KEY }}
+      CONFLUENT_CLOUD_API_SECRET: ${{ secrets.CONFLUENT_CLOUD_API_SECRET }}
+      # Flink-pool-scoped credentials (used by `confluent flink statement *`)
+      CONFLUENT_FLINK_API_KEY: ${{ secrets.CONFLUENT_FLINK_API_KEY }}
+      CONFLUENT_FLINK_API_SECRET: ${{ secrets.CONFLUENT_FLINK_API_SECRET }}
+      # Per-environment IDs (looked up dynamically by env input)
+      ENV_ID: ${{ secrets[format('CONFLUENT_ENV_ID_{0}', github.event.inputs.env)] }}
+      COMPUTE_POOL_ID: ${{ secrets[format('CONFLUENT_FLINK_COMPUTE_POOL_ID_{0}', github.event.inputs.env)] }}
+      ORG_ID: ${{ secrets.CONFLUENT_ORG_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate inputs
+        run: |
+          ACTION="${{ github.event.inputs.action }}"
+          STMT="${{ github.event.inputs.statement }}"
+          if [[ "$ACTION" != "list" && -z "$STMT" ]]; then
+            echo "::error::statement name is required for action '$ACTION'"
+            exit 1
+          fi
+
+      - name: Install Confluent CLI
+        run: |
+          curl -sL --http1.1 https://cnfl.io/cli | sh -s -- -b /usr/local/bin latest
+
+      - name: Run lifecycle action
+        run: |
+          ./scripts/flink_lifecycle.sh \
+            "${{ github.event.inputs.action }}" \
+            "${{ github.event.inputs.statement }}"
