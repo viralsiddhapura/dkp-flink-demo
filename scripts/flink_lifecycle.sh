@@ -32,7 +32,7 @@ if [[ "$ACTION" != "list" && -z "$STATEMENT" ]]; then
 fi
 
 echo "==> Logging in to Confluent Cloud (org $ORG_ID)"
-confluent login --save --no-browser --organization-id "$ORG_ID"
+confluent login --save --no-browser --organization "$ORG_ID"
 confluent environment use "$ENV_ID"
 
 case "$ACTION" in

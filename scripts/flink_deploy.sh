@@ -28,7 +28,7 @@ echo "==> Deploying statement: $STATEMENT_NAME"
 echo "    file: $SQL_FILE"
 echo "    env:  $ENV_ID  pool: $COMPUTE_POOL_ID"
 
-confluent login --save --no-browser --organization-id "$ORG_ID"
+confluent login --save --no-browser --organization "$ORG_ID"
 confluent environment use "$ENV_ID"
 
 current_status() {
