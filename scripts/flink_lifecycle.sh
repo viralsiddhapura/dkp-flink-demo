@@ -66,11 +66,14 @@ fi
 case "${ACTION}" in
   stop)
     echo "==> Stopping statement: ${STATEMENT} (state retained)"
-    RESULT="$(api_call PATCH "/${STATEMENT}" '[{"op":"replace","path":"/spec/stopped","value":true}]')"
+    # `add` is preferred over `replace` here: it sets the value regardless of
+    # the current presence/value at the path, which avoids 422s on no-op or
+    # fresh-spec edge cases.
+    RESULT="$(api_call PATCH "/${STATEMENT}" '[{"op":"add","path":"/spec/stopped","value":true}]')"
     ;;
   resume)
     echo "==> Resuming statement: ${STATEMENT}"
-    RESULT="$(api_call PATCH "/${STATEMENT}" '[{"op":"replace","path":"/spec/stopped","value":false}]')"
+    RESULT="$(api_call PATCH "/${STATEMENT}" '[{"op":"add","path":"/spec/stopped","value":false}]')"
     ;;
   delete)
     echo "==> Deleting statement: ${STATEMENT} (NOT reversible)"
